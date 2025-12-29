@@ -2,29 +2,38 @@ from diffusers.pipelines.pipeline_utils import DiffusionPipeline
 from PIL import Image
 import torch
 import random
+from typing import Optional, Tuple
+
+# Lazy singletons to avoid reloading weights on every request
+_base_pipe: Optional[DiffusionPipeline] = None
+_refiner_pipe: Optional[DiffusionPipeline] = None
+
+
+def _get_pipes() -> Tuple[DiffusionPipeline, DiffusionPipeline]:
+    global _base_pipe, _refiner_pipe
+    if _base_pipe is None:
+        _base_pipe = DiffusionPipeline.from_pretrained(
+            "stabilityai/stable-diffusion-xl-base-1.0",
+            torch_dtype=torch.float16,
+            variant="fp16",
+            use_safetensors=True,
+        ).to("cuda")
+    if _refiner_pipe is None:
+        _refiner_pipe = DiffusionPipeline.from_pretrained(
+            "stabilityai/stable-diffusion-xl-refiner-1.0",
+            text_encoder_2=_base_pipe.text_encoder_2,  # type: ignore
+            vae=_base_pipe.vae,  # type: ignore
+            torch_dtype=torch.float16,
+            use_safetensors=True,
+            variant="fp16",
+        ).to("cuda")
+    return _base_pipe, _refiner_pipe
 
 
 def generate_image(
     input_prompt="a futuristic city scape, intergalatic civilization floating through a colorful universe, stars and colorful nebula, award winning illustration, highly detailed, bold line work, bright saturated colors, beautiful composition, artstation, 8k",
 ) -> Image.Image:
-    negative_prompt = "lowres, bad anatomy, bad hands, text, error, missing fingers, extra digit, fewer digits, cropped, worst quality, low quality, jpeg artifacts, signature, watermark, username, blurry, lens flair, horrifying, ugly, deformed, grotesque"
-    # load both base & refiner experts
-    base = DiffusionPipeline.from_pretrained(
-        "stabilityai/stable-diffusion-xl-base-1.0",
-        torch_dtype=torch.float16,
-        variant="fp16",
-        use_safetensors=True,
-    )
-    base.to("cuda")
-    refiner = DiffusionPipeline.from_pretrained(
-        "stabilityai/stable-diffusion-xl-refiner-1.0",
-        text_encoder_2=base.text_encoder_2,
-        vae=base.vae,
-        torch_dtype=torch.float16,
-        use_safetensors=True,
-        variant="fp16",
-    )
-    refiner.to("cuda")
+    base, refiner = _get_pipes()
 
     # Define how many steps and what % of steps to be run on each experts (80/20) here
     n_steps = 35

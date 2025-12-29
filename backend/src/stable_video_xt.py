@@ -3,10 +3,25 @@ import torch
 from diffusers.pipelines.stable_video_diffusion.pipeline_stable_video_diffusion import (
     StableVideoDiffusionPipeline,
 )
-from diffusers.utils.loading_utils import load_image
 from diffusers.utils.export_utils import export_to_video
 from typing import Optional, Tuple
 from PIL import Image
+
+# Lazy singleton to avoid reloading weights on every request
+_video_pipe: Optional[StableVideoDiffusionPipeline] = None
+
+
+def get_video_pipe() -> StableVideoDiffusionPipeline:
+    global _video_pipe
+    if _video_pipe is None:
+        pipe = StableVideoDiffusionPipeline.from_pretrained(
+            "stabilityai/stable-video-diffusion-img2vid-xt",
+            torch_dtype=torch.float16,
+            variant="fp16",
+        )
+        pipe.to("cuda")
+        _video_pipe = pipe
+    return _video_pipe
 
 
 def generate_video(
@@ -18,12 +33,7 @@ def generate_video(
     motion_bucket: Optional[int] = 120,
     noise_aug_strength: Optional[float] = 0.1,
 ):
-    pipe = StableVideoDiffusionPipeline.from_pretrained(
-        "stabilityai/stable-video-diffusion-img2vid-xt",
-        torch_dtype=torch.float16,
-        variant="fp16",
-    )
-    pipe.to("cuda")
+    pipe = get_video_pipe()
 
     # Load the conditioning image
     image = Image.open(image_path)
