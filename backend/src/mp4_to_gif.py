@@ -1,3 +1,4 @@
+import moviepy as mpy
 from moviepy.video.io.VideoFileClip import VideoFileClip
 
 
@@ -8,22 +9,21 @@ def convert_mp4_to_gif(
     end_time=None,
     resize=(1024, 1024),
 ):
-    # Load the video file
-    clip = VideoFileClip(input_video_path)
+    # Load, trim, resize, and save GIF
+    with VideoFileClip(input_video_path) as clip:
+        if end_time is None:
+            end_time = clip.duration
+        try:
+            trimmed_clip = clip.subclip(start_time, end_time)
+        except AttributeError:
+            # moviepy >=2 uses subclipped
+            trimmed_clip = clip.subclipped(start_time, end_time)
 
-    # If an end time is not specified, use the full duration of the clip
-    if end_time is None:
-        end_time = clip.duration
+        if resize:
+            # moviepy 2.x exposes Resize effect class
+            trimmed_clip = trimmed_clip.with_effects([mpy.vfx.Resize(new_size=resize)])
 
-    # Trim the clip if start_time and/or end_time is specified
-    trimmed_clip = clip.subclip(start_time, end_time)
-
-    # Resize the clip if a new size is specified
-    if resize:
-        trimmed_clip = trimmed_clip.resize(newsize=resize)
-
-    # Write the GIF file
-    trimmed_clip.write_gif(output_gif_path, fps=10)
+        trimmed_clip.write_gif(output_gif_path, fps=10)
 
 
 if __name__ == "__main__":

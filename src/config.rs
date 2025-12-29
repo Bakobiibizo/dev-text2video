@@ -16,13 +16,17 @@ impl Config {
         let api_port = env::var("API_PORT")
             .ok()
             .and_then(|v| v.parse().ok())
-            .unwrap_or(7102);
-        let backend_url = env::var("BACKEND_URL").unwrap_or_else(|_| "http://localhost:7102".to_string());
+            .unwrap_or(7095);
+        let backend_port = env::var("BACKEND_PORT")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(7105);
+        let backend_url = env::var("BACKEND_URL").unwrap_or_else(|_| format!("http://localhost:{}", backend_port));
         let preload = env::var("PRELOAD")
             .ok()
             .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
             .unwrap_or(true);
-        let backend = BackendConfig::from_env(7102);
+        let backend = BackendConfig::from_env(backend_port);
         Self {
             api_host,
             api_port,
