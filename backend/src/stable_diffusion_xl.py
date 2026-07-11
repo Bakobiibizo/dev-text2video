@@ -2,6 +2,7 @@ from diffusers.pipelines.pipeline_utils import DiffusionPipeline
 from PIL import Image
 import torch
 import random
+import os
 from typing import Optional, Tuple
 
 # Lazy singletons to avoid reloading weights on every request
@@ -9,15 +10,14 @@ _base_pipe: Optional[DiffusionPipeline] = None
 _refiner_pipe: Optional[DiffusionPipeline] = None
 
 
-def _get_pipes() -> Tuple[DiffusionPipeline, DiffusionPipeline]:
+def _get_pipes(model_id: str) -> Tuple[DiffusionPipeline, DiffusionPipeline]:
     global _base_pipe, _refiner_pipe
     if _base_pipe is None:
         _base_pipe = DiffusionPipeline.from_pretrained(
-            "stabilityai/stable-diffusion-xl-base-1.0",
-            torch_dtype=torch.float16,
-            variant="fp16",
+            model_id,
+            torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
             use_safetensors=True,
-        ).to("cuda")
+        ).to(os.getenv("DEVICE", "cuda" if torch.cuda.is_available() else "cpu"))
     if _refiner_pipe is None:
         _refiner_pipe = DiffusionPipeline.from_pretrained(
             "stabilityai/stable-diffusion-xl-refiner-1.0",
@@ -26,14 +26,15 @@ def _get_pipes() -> Tuple[DiffusionPipeline, DiffusionPipeline]:
             torch_dtype=torch.float16,
             use_safetensors=True,
             variant="fp16",
-        ).to("cuda")
+        ).to(os.getenv("DEVICE", "cuda" if torch.cuda.is_available() else "cpu"))
     return _base_pipe, _refiner_pipe
 
 
 def generate_image(
-    input_prompt="a futuristic city scape, intergalatic civilization floating through a colorful universe, stars and colorful nebula, award winning illustration, highly detailed, bold line work, bright saturated colors, beautiful composition, artstation, 8k",
+    input_prompt="a futuristic city scape",
+    model_id="stabilityai/stable-diffusion-xl-base-1.0",
 ) -> Image.Image:
-    base, refiner = _get_pipes()
+    base, refiner = _get_pipes(model_id)
 
     # Define how many steps and what % of steps to be run on each experts (80/20) here
     n_steps = 35

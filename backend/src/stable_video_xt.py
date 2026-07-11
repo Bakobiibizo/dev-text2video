@@ -1,4 +1,5 @@
 import torch
+import os
 
 from diffusers.pipelines.stable_video_diffusion.pipeline_stable_video_diffusion import (
     StableVideoDiffusionPipeline,
@@ -11,15 +12,14 @@ from PIL import Image
 _video_pipe: Optional[StableVideoDiffusionPipeline] = None
 
 
-def get_video_pipe() -> StableVideoDiffusionPipeline:
+def get_video_pipe(model_id: str) -> StableVideoDiffusionPipeline:
     global _video_pipe
     if _video_pipe is None:
         pipe = StableVideoDiffusionPipeline.from_pretrained(
-            "stabilityai/stable-video-diffusion-img2vid-xt",
-            torch_dtype=torch.float16,
-            variant="fp16",
+            model_id,
+            torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
         )
-        pipe.to("cuda")
+        pipe.to(os.getenv("DEVICE", "cuda" if torch.cuda.is_available() else "cpu"))
         _video_pipe = pipe
     return _video_pipe
 
@@ -32,8 +32,9 @@ def generate_video(
     chunk_size: Optional[int] = 4,
     motion_bucket: Optional[int] = 120,
     noise_aug_strength: Optional[float] = 0.1,
+    model_id: str = "stabilityai/stable-video-diffusion-img2vid-xt",
 ):
-    pipe = get_video_pipe()
+    pipe = get_video_pipe(model_id)
 
     # Load the conditioning image
     image = Image.open(image_path)

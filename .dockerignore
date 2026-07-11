@@ -1,0 +1,6 @@
+.git
+target
+outputs
+backend/.venv
+backend/__pycache__
+backend/data
